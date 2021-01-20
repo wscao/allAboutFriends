@@ -1,0 +1,12 @@
+name: allaboutfriends
+title:
+username:
+account: wonderwall
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3298526
+bundleId: 3992971
+url: https://wonderwall.shinyapps.io/allaboutfriends/
+when: 1608053617.33481
+asMultiple: FALSE
+asStatic: FALSE

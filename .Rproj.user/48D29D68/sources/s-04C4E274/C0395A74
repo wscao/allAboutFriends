@@ -1,0 +1,32 @@
+{
+    "id": "C0395A74",
+    "path": null,
+    "project_path": null,
+    "type": "r_dataframe",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1606267248880.0,
+    "source_on_save": false,
+    "relative_order": 5,
+    "properties": {
+        "expression": "text_df",
+        "caption": "text_df",
+        "totalObservations": 67373,
+        "displayedObservations": 67373,
+        "variables": 6,
+        "cacheKey": "FE74B41B",
+        "object": "text_df",
+        "environment": "",
+        "contentUrl": "grid_resource/gridviewer.html?env=&obj=text_df&cache_key=FE74B41B&max_cols=50",
+        "preview": 0
+    },
+    "folds": "",
+    "lastKnownWriteTime": 100,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1606267248880,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,457 @@
+---
+title: "The One with the Sentiments"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: bootstrap
+   
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(flexdashboard)
+library(tidyverse)
+library(knitr)
+library(png)
+library(friends)
+library(tidytext)
+```
+
+```{r data preparation, include=FALSE}
+main_chars <- c("Rachel Green", "Monica Geller", "Ross Geller", "Joey Tribbiani", "Chandler Bing", "Phoebe Buffay")
+total_lines <- friends %>% 
+  filter(speaker %in% main_chars) %>% 
+  summarise(lines=n())
+
+ lines_df <- friends %>% 
+  filter(speaker %in% main_chars) %>% 
+  group_by(speaker) %>% 
+  summarise(lines=n()) %>% 
+  rbind(tibble(speaker="Total", lines=as.integer(total_lines)))
+
+
+
+
+```
+
+Characters
+==================================================
+Column
+-------------------------------------------------
+### 
+```{r fig.cap="Friends Main Characters"}
+include_graphics("friends.jpg")
+
+
+```
+
+
+Column
+-------------------------------------------------
+### 
+```{r}
+ggplot(lines_df, aes(fct_reorder(speaker,lines), lines, fill=speaker))+geom_col()+scale_y_continuous(limits = c(0, 58000), breaks =seq(0, 50000, 4000))+geom_text(aes(label=paste(str_extract(speaker, "[^ ]+"),""), y=0), hjust=1)+ coord_polar(theta = "y", start = 0, clip = "off")+labs(x="", y="", title = "the No. of Lines Each Character Spoke")+theme(legend.position = "none",
+             axis.text.y = element_blank(),
+             axis.ticks.y= element_blank(),
+             panel.background = element_blank())                                                                                                                                                                                                                                                                                         
+```
+
+Words 
+=================================================
+
+Column 
+------------------------------------------------
+
+### words network {.no-title}
+```{r}
+scripts <- friends %>% 
+  filter(speaker %in% main_chars) %>% 
+  select(text)
+
+friends_bigrams <- scripts %>% 
+  unnest_tokens(bigram, text, token = "ngrams", n=2)
+
+# remove stop words
+undesirable_words <- c("hey", "yeah", "uh", "whoa", "la", "ha", "ow", "ooh","ho","gonna", "huh", "hmm", "woo", "hoo","blah", "ew","woah","mmmhm","wow", "ohh", "ah", "umm", "wanna", "bye", "y'know", "alright", "gotta", stop_words$word)
+
+bigrams_separated <- friends_bigrams %>% 
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+bigrams_filtered <- bigrams_separated %>% 
+  filter(!word1 %in% undesirable_words) %>% 
+  filter(!word2 %in% undesirable_words)
+
+# new bigram counts
+bigram_counts <- bigrams_filtered %>% 
+  count(word1, word2, sort = TRUE)
+
+bigrams_united <- bigrams_filtered %>% 
+  unite(bigram, word1, word2, sep=" ")
+
+library(igraph)
+# filter for only relatively common combinations
+bigram_graph <- bigram_counts %>% 
+   filter(n>10) %>% 
+   graph_from_data_frame()
+
+library(ggraph)
+set.seed(2020)
+ggraph(bigram_graph, layout = "fr")+geom_edge_link(aes(edge_alpha=n, edge_width=n),edge_colour="#756bb1") + geom_node_point(size=3) + geom_node_text(aes(label=name),repel = TRUE, point.padding=unit(0.2, "lines")) + theme_void()
+
+
+```
+
+
+Column
+-----------------------------------------------
+### wordcloud 1 {.no-title}
+
+```{r }
+library(knitr)
+
+friends_words_filtered <- scripts %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% undesirable_words)
+
+friends_instance <- friends %>% 
+  mutate(instance=paste(season, episode, scene, utterance, sep="_")) %>% 
+  select(instance, text)
+  
+friends_new <- friends %>% 
+  unnest_tokens(bigram, text, token = "ngrams", n=2) %>% 
+  separate(bigram, c("word1", "word2"), sep = " ") %>% 
+  filter(!word1 %in% undesirable_words) %>% 
+  filter(!word2 %in% undesirable_words) %>% 
+  unite(bigram, word1, word2, sep=" ") %>% 
+  filter(bigram=="ralph lauren") %>% 
+  filter(speaker %in% main_chars) %>% 
+  mutate(instance=paste(season, episode, scene, utterance, sep="_")) %>% 
+  left_join(friends_instance)
+
+library(kableExtra)
+library(formattable)
+
+friends_new %>% 
+  filter(instance=="5_8_2_4" | instance=="9_18_3_18" | instance=="5_17_6_14" | instance=="6_13_5_6" | instance=="10_15_5_6" | instance=="10_15_12_5") %>% 
+  select(-c(scene, utterance, instance)) %>% 
+  mutate(speaker = color_tile("#bcbddc","#bcbddc")(speaker)) %>%
+  mutate(bigram = color_tile("#9ebcda","#9ebcda")(bigram)) %>%
+  kable("html", escape = FALSE, align = "c", caption = "Where does Ralph Lauren Appear") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                  full_width = FALSE)
+```
+
+
+
+Emotional Change
+=================================================
+## Column 1 {.tabset}
+### Rachel
+
+```{r themeSetting, include=FALSE}
+library(showtext)
+
+# set the font               
+                     
+font_add("Josef Xuereb's Friends",
+    regular = "Josef Xuereb s Friends - Regular.ttf",
+    bold = "Josef Xuereb s Friends - Bold.ttf")
+
+showtext_auto()
+
+
+font_family1 <- "Josef Xuereb's Friends"
+font_family2 <- 'Century Gothic'
+
+# set theme style
+
+theme_style <- theme(
+                    
+                     plot.title = element_text(size=36, family = font_family1),
+                     plot.title.position = "plot",
+                     plot.subtitle = element_text(size=16, family = font_family2),
+                     panel.border = element_blank(),
+                    
+                     
+                     plot.margin = unit(c(1,1,1,1), "cm"),
+                     axis.title = element_blank(),
+                     
+                     axis.text.y = element_blank(),
+                     axis.text.x = element_text(size=15, angle= 40, family = font_family2),
+                     
+                     axis.line  = element_blank(),
+                     axis.ticks = element_blank(),
+                     legend.text = element_text(size = 15, family = font_family2),
+                     legend.key.size = unit(0.8, "line"),
+                     
+                     legend.title = element_blank(),
+                     legend.box = "horizontal",
+                     legend.position = "top",
+                     legend.justification = "left")
+
+theme_set(theme_classic()+theme_style)
+
+# set colour palette
+
+cols <- c("#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5")
+                                              
+
+```
+
+
+```{r}
+
+rachel_emo <- friends %>% 
+  filter(speaker=="Rachel Green") %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% undesirable_words) %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  filter(!sentiment %in% c("positive", "negative")) %>% 
+  group_by(season,sentiment) %>% 
+  summarise(n=n())
+
+
+# plot the graph     
+library(ggstream)
+
+ggplot(rachel_emo, aes(season, n, fill = factor(sentiment))) +
+geom_stream(method = "raw", bw = .7) +
+scale_x_continuous(breaks = seq(1, 10, 3), labels = c("Season 1", "Season 4", "Season 7", "Season 10")) +
+scale_fill_manual(values = cols)+
+geom_vline(data = tibble(x = seq(1,10)),
+aes(xintercept = x), color = "black", size = .1, linetype="dotted")+
+labs(title = "Rachel's Emotional Change",
+     subtitle = "Sentiments Development throught Season 1 - 10")
+  
+  
+```
+
+### Ross 
+
+```{r}
+ross_emo <- friends %>% 
+  filter(speaker=="Ross Geller") %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% undesirable_words) %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  filter(!sentiment %in% c("positive", "negative")) %>% 
+  group_by(season,sentiment) %>% 
+  summarise(n=n())
+
+
+# plot the graph     
+
+ggplot(ross_emo, aes(season, n, fill = factor(sentiment))) +
+geom_stream(method = "raw", bw = .7) +
+scale_x_continuous(breaks = seq(1, 10, 3), labels = c("Season 1", "Season 4", "Season 7", "Season 10")) +
+scale_fill_manual(values = cols)+
+geom_vline(data = tibble(x = seq(1,10)),
+aes(xintercept = x), color = "black", size = .1, linetype="dotted")+
+labs(title = "Ross's Emotional Change",
+     subtitle = "Sentiments Development throught Season 1 - 10")
+  
+```
+
+### Phoebe
+
+```{r}
+phoebe_emo <- friends %>% 
+  filter(speaker=="Phoebe Buffay") %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% undesirable_words) %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  filter(!sentiment %in% c("positive", "negative")) %>% 
+  group_by(season,sentiment) %>% 
+  summarise(n=n())
+
+
+# plot the graph     
+
+ggplot(phoebe_emo, aes(season, n, fill = factor(sentiment))) +
+geom_stream(method = "raw", bw = .7) +
+scale_x_continuous(breaks = seq(1, 10, 3), labels = c("Season 1", "Season 4", "Season 7", "Season 10")) +
+scale_fill_manual(values = cols)+
+geom_vline(data = tibble(x = seq(1,10)),
+aes(xintercept = x), color = "black", size = .1, linetype="dotted")+
+labs(title = "Phoebe's Emotional Change",
+     subtitle = "Sentiments Development throught Season 1 - 10")
+  
+```
+
+## Column 2 {.tabset}
+
+### Monica
+
+```{r}
+monica_emo <- friends %>% 
+  filter(speaker=="Monica Geller") %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% undesirable_words) %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  filter(!sentiment %in% c("positive", "negative")) %>% 
+  group_by(season,sentiment) %>% 
+  summarise(n=n())
+
+
+# plot the graph     
+
+ggplot(monica_emo, aes(season, n, fill = factor(sentiment))) +
+geom_stream(method = "raw", bw = .7) +
+scale_x_continuous(breaks = seq(1, 10, 3), labels = c("Season 1", "Season 4", "Season 7", "Season 10")) +
+scale_fill_manual(values = cols)+
+geom_vline(data = tibble(x = seq(1,10)),
+aes(xintercept = x), color = "black", size = .1, linetype="dotted")+
+labs(title = "Monica's Emotional Change",
+     subtitle = "Sentiments Development throught Season 1 - 10")
+  
+```
+
+### Chandler
+
+```{r}
+chandler_emo <- friends %>% 
+  filter(speaker=="Chandler Bing") %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% undesirable_words) %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  filter(!sentiment %in% c("positive", "negative")) %>% 
+  group_by(season,sentiment) %>% 
+  summarise(n=n())
+
+
+# plot the graph     
+
+ggplot(chandler_emo, aes(season, n, fill = factor(sentiment))) +
+geom_stream(method = "raw", bw = .7) +
+scale_x_continuous(breaks = seq(1, 10, 3), labels = c("Season 1", "Season 4", "Season 7", "Season 10")) +
+scale_fill_manual(values = cols)+
+geom_vline(data = tibble(x = seq(1,10)),
+aes(xintercept = x), color = "black", size = .1, linetype="dotted")+
+labs(title = "Chandler's Emotional Change",
+     subtitle = "Sentiments Development throught Season 1 - 10")
+  
+```
+
+### Joey
+
+```{r}
+joey_emo <- friends %>% 
+  filter(speaker=="Joey Tribbiani") %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% undesirable_words) %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  filter(!sentiment %in% c("positive", "negative")) %>% 
+  group_by(season,sentiment) %>% 
+  summarise(n=n())
+
+
+# plot the graph     
+
+ggplot(joey_emo, aes(season, n, fill = factor(sentiment))) +
+geom_stream(method = "raw", bw = .7) +
+scale_x_continuous(breaks = seq(1, 10, 3), labels = c("Season 1", "Season 4", "Season 7", "Season 10")) +
+scale_fill_manual(values = cols)+
+geom_vline(data = tibble(x = seq(1,10)),
+aes(xintercept = x), color = "black", size = .1, linetype="dotted")+
+labs(title = "Joey's Emotional Change",
+     subtitle = "Sentiments Development throught Season 1 - 10")
+  
+```
+
+Emotions
+================================================
+
+
+```{r}
+library(circlize)
+friends_emo_all <- friends %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% undesirable_words) %>% 
+  inner_join(get_sentiments("nrc")) 
+
+friends_emo_seasons <- friends_emo_all %>% 
+  filter(!sentiment %in% c("positive", "negative")) %>% 
+  count(season, sentiment) %>% 
+  group_by(season, sentiment) %>% 
+  summarise(sentiment_sum=sum(n)) %>% 
+  ungroup()
+
+friends_emo_1to5 <- friends_emo_seasons %>% filter(season %in% c("1", "2", "3", "4", "5"))
+
+library(RColorBrewer)
+
+colors <- brewer.pal(8, "Accent")
+my_colors <- colorRampPalette(colors)(11)
+
+grid.col = c("1" = my_colors[1], "2" = my_colors[2], "3" = my_colors[3], "4" = my_colors[4], "5" = my_colors[5], "anger" = "grey", "anticipation" = "grey", "disgust" = "grey", "fear" = "grey", "joy" = "grey", "sadness" = "grey", "surprise" = "grey", "trust" = "grey")
+
+circos.clear()
+
+#Set the gap size  
+
+circos.par(gap.after = c(rep(5, length(unique(friends_emo_1to5[[1]])) - 1), 15,
+                         rep(5, length(unique(friends_emo_1to5[[2]])) - 1), 15))
+
+p1 <- chordDiagram(friends_emo_1to5, grid.col = grid.col, transparency = .2)
+
+title("Relationship Between Emotion and Season 1- 5")
+
+# the 2nd chordgram
+friends_emo_6to10 <- friends_emo_seasons %>% filter(!season %in% c("1", "2", "3", "4", "5"))
+
+grid.col2 = c("6" = my_colors[6], "7" = my_colors[7], "8" = my_colors[8], "9" = my_colors[9], "10" = my_colors[10], "anger" = "grey", "anticipation" = "grey", "disgust" = "grey", "fear" = "grey", "joy" = "grey", "sadness" = "grey", "surprise" = "grey", "trust" = "grey")
+
+circos.par(gap.after = c(rep(5, length(unique(friends_emo_6to10[[1]])) - 1), 15,
+                         rep(5, length(unique(friends_emo_6to10[[2]])) - 1), 15))
+
+p2 <- chordDiagram(friends_emo_6to10, grid.col = grid.col2, transparency = .2)
+
+title("Relationship Between Emotion and Season 6- 10")
+```
+
+
+Ratings
+=================================================
+
+```{r}
+friends_ratings <- friends_info %>% 
+  mutate(series_episode=row_number()) %>% 
+  group_by(season) %>% 
+  mutate(avg_rating = mean(imdb_rating),
+        
+         season = as.factor(season),
+         more_less = ifelse(imdb_rating>avg_rating, "more", "less"),
+         season_start = min(series_episode),
+         season_end = max(series_episode),
+         season_word = case_when(
+           season ==1 ~ "One",
+           season ==2 ~ "Two",
+           season ==3 ~ "Three",
+           season ==4 ~ "Four",
+           season ==5 ~ "Five",
+           season ==6 ~ "Six",
+           season ==7 ~ "Seven",
+           season ==8 ~ "Eight",
+           season ==9 ~ "Nine",
+           season ==10 ~ "Ten"
+         )) 
+
+
+
+library(ggpubr)
+
+ options(repr.plot.width = 25, repr.plot.height = 8)
+ggdotchart(friends_ratings, 
+           x = "series_episode", 
+           y = "imdb_rating", 
+           color = "season", 
+        
+         
+           add = "segments", 
+           add.params = list(color = "lightgray", size = 1), 
+           group = "season", 
+           dot.size = 2 ) + geom_line(aes(x = series_episode, y = avg_rating, 
+group = season), color = "black")+ theme(axis.text.x = element_blank(),
+                                                       axis.ticks.x = element_blank()) + ylim(6,10)
+```
+

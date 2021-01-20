@@ -1,0 +1,133 @@
+library(shiny)
+library(tidyverse)
+library(friends)
+library(tidytext)
+library(ggthemes)
+library(ggrepel)
+library(reshape2)
+library(wordcloud)
+library(wesanderson)
+library(showtext)
+
+
+# set the font               
+
+font_add("Josef Xuereb's Friends",
+         regular = "Josef Xuereb s Friends - Regular.ttf",
+         bold = "Josef Xuereb s Friends - Bold.ttf")
+
+showtext_auto()
+
+
+font_family1 <- "Josef Xuereb's Friends"
+
+theme_lyrics <- function(aticks = element_blank(),
+                         pgminor = element_blank(),
+                         lt = element_blank(),
+                         lp = "none")
+{
+    theme(plot.title = element_text(hjust = 0.5), #Center the title
+          axis.ticks = aticks, #Set axis ticks to on or off
+          panel.grid.minor = pgminor, #Turn the minor grid lines on or off
+          legend.title = lt, #Turn the legend title on or off
+          legend.position = lp) #Turn the legend on or off
+}
+text_df <- tibble(friends)
+
+main_chars <- c("Rachel Green", "Monica Geller", "Ross Geller", 
+                "Joey Tribbiani", "Chandler Bing", "Phoebe Buffay")
+
+# customized stop words
+undesirable_words <- c("hey", "yeah", "uh", "whoa", "la", "ha", 
+                       "ow", "ooh","ho","gonna", "huh", "hmm", "woo", 
+                       "hoo","blah", "ew","woah","mmmhm","wow", "ohh", "ah", 
+                       "umm", "wanna", "hey", "y'know", "alright", "gotta", "uh", stop_words$word)
+
+# Define UI for application that draws a histogram
+ui <- fluidPage(
+  theme = shinythemes::shinytheme("slate"),
+  titlePanel("All About Friends"),
+  
+  fluidRow(
+        column(5,
+               selectInput("mainChars", "Choose one character", main_chars)
+        ),
+        column(7, selectInput("season", "Choose a season", unique(text_df$season), "all seasons"))
+    ),
+  
+ fluidRow(
+        column(4, imageOutput("picture")),
+        column(8, dataTableOutput("scripts"))
+        
+    ),
+ 
+ fluidRow(
+     column(12, plotOutput("sentimentbytime"))
+     
+ )
+    
+)
+
+server <- function(input, output, session){
+    selected <- reactive(text_df %>% filter(speaker == input$mainChars) %>% 
+                             unnest_tokens(word, text) %>% 
+                             filter(!word %in% undesirable_words))
+    
+   
+    selected2 <- reactive(text_df %>% 
+                              filter(speaker==input$mainChars) %>% 
+                              filter(season==input$season) %>% 
+                              select(-c("scene", "utterance")))
+    
+    output$picture <- renderImage({
+       filename <- normalizePath(file.path("WWW/", paste(input$mainChars, ".png", sep="")))
+       
+       list(src = filename,
+            alt = paste("picture of ", input$mainChars))
+                                 
+                                 }, deleteFile = FALSE)
+       
+    output$scripts <- renderDataTable(
+        
+        selected2(),
+        options = list(pageLength = 5) 
+        
+    )
+    
+    output$sentimentbytime <- renderPlot(
+        selected() %>% 
+            group_by(season) %>%
+            mutate(total_words = n()) %>%
+            ungroup() %>%
+            inner_join(get_sentiments("nrc"))%>%
+            filter(sentiment %in% c("anger", "disgust", "fear", "joy","sadness") ) %>%
+            count(season, sentiment, total_words) %>%
+            ungroup() %>%
+            mutate(percent = (n / total_words)) %>%
+            ggplot(aes(season, percent, color = sentiment)) +
+            geom_line(size = 1.5) +
+            geom_smooth(method = "lm", se = FALSE, lty = 2) +
+            expand_limits(y = 0)+
+            labs(title=paste(input$mainChars, "'s Emotions by Season")) + 
+            scale_color_manual(values=wes_palette("Darjeeling1"))+ 
+            scale_x_continuous(name="", breaks = seq(1,10, 2), labels = c("Season 1", "Season 3", "Season 5", "Season 7", "Season 9"))+
+            theme_minimal()+
+            theme(axis.text.y = element_blank(),
+                  axis.ticks = element_blank(),
+                  axis.text.x=element_text(angle=36, vjust = 0.6, colour = "white", size = 11),
+                  legend.position = "top",
+                  axis.title = element_blank(),
+                  plot.background = element_rect(fill = "#272B30", colour = "#272B30"),
+                  panel.border = element_blank(),
+                  panel.grid.minor.y = element_blank(),
+                  panel.grid.minor.x = element_blank(),
+                  panel.grid = element_line(colour = "#495464"),
+                  text = element_text(colour = "white"),
+                  plot.title = element_text(family = font_family1, size = 28)
+                  
+                  )
+    )
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
